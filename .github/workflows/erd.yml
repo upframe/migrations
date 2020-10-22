@@ -1,0 +1,79 @@
+name: ERD
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  generate-erd:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: upframe
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Setup Node
+        uses: actions/setup-node@v1.1.0
+        with:
+          version: 12
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-2
+
+      - name: Setup Java
+        uses: actions/setup-java@v1
+        with:
+          java-version: 14
+          java-package: jre
+
+      - name: Install NPM Dependencies
+        run: npm install
+
+      - name: Run Migrations
+        run: |
+          echo "
+            DB_HOST=localhost
+            DB_PORT=5432
+            DB_USER=postgres
+            DB_PASS=postgres
+            DB_NAME=upframe
+          " >> .env
+          echo "== .env ==\n$(cat .env)"
+          npm run latest
+
+      - name: Install Diagram Dependencies
+        run: |
+          sudo apt-get install graphviz
+          sh diagram/install.sh
+
+      - name: Generate Diagram
+        run: sh diagram/generate.sh
+
+      - name: Upload Diagram
+        run: |
+          echo "upload latest"
+          aws s3 cp upframe_latest.png s3://upframe-erd/ --acl public-read
+          FILE_NAME="upframe_$(date +"%Y-%m-%d_%T").png"
+          echo "upload ${FILE_NAME}"
+          mv upframe_latest.png $FILE_NAME
+          aws s3 cp $FILE_NAME s3://upframe-erd/ --acl public-read
