@@ -24,6 +24,7 @@
     "prettier.config.js",
     "sls.conf.js",
     "webpack.config.js",
-    "confirm.js"
+    "confirm.js",
+    "diagram",
   ]
 }

@@ -18,7 +18,7 @@ export async function up(knex: Knex): Promise<void> {
     t.uuid('user_id').references('users.id').onDelete('CASCADE').notNullable()
     t.uuid('space_id').references('spaces.id').onDelete('CASCADE').notNullable()
     t.boolean('is_mentor').notNullable().defaultTo(false)
-    t.boolean('is_moderator').notNullable().defaultTo(false)
+    t.boolean('is_owner').notNullable().defaultTo(false)
 
     t.primary(['user_id', 'space_id'])
   })
