@@ -1,6 +1,5 @@
 require('dotenv').config()
 require('ts-node').register({ compilerOptions: { module: 'commonjs' } })
-const readline = require('readline')
 
 module.exports = {
   client: 'pg',
