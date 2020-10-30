@@ -77,3 +77,6 @@ jobs:
           echo "upload ${FILE_NAME}"
           mv upframe_latest.png $FILE_NAME
           aws s3 cp $FILE_NAME s3://upframe-erd/ --acl public-read
+
+      - name: Remove from GitHub Camo cache
+        run: curl -X PURGE https://camo.githubusercontent.com/b7e2e024bba6da62b8d9fd8ee916e2e92065fd92/68747470733a2f2f75706672616d652d6572642e73332d65752d776573742d312e616d617a6f6e6177732e636f6d2f75706672616d655f6c61746573742e706e67
