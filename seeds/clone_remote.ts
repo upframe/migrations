@@ -9,15 +9,40 @@ const rl = readline.createInterface({
 })
 
 const ask = async (txt: string): Promise<string> =>
-  await new Promise(res => rl.question(`${txt}: `, res))
+  await new Promise(res =>
+    rl.question(txt.includes('\n') ? txt : `${txt}: `, res)
+  )
 
 export async function seed(knex: Knex): Promise<any> {
-  console.log('\nPlease login as an admin:\n')
+  let input: string
+  const answer = () => {
+    let v = parseFloat(input.trim())
+    if (v === 1) return 'users'
+    if (v === 2) return 'mentors'
+    console.error('invalid input')
+  }
+  do {
+    input = await ask(`
+Do you want to fetch all users or just the mentors listed on the landing page?
+Fetching all users will require you to sign in as an admin.
 
-  const authCookie = await login(await ask('email'), await ask('password'))
+(1): all users
+(2): just mentors
+
+`)
+  } while (!answer())
 
   await reset(knex)
-  await createUsers(knex, authCookie)
+
+  if (answer() === 'users') {
+    console.log('\nPlease login as an admin:\n')
+    await createUsers(
+      knex,
+      true,
+      await login(await ask('email'), await ask('password'))
+    )
+  } else await createUsers(knex, false, undefined)
+
   await createLists(knex)
 }
 
@@ -73,8 +98,8 @@ const unique = <T, K extends () => T>(func: K) => {
   return v
 }
 
-async function createUsers(knex: Knex, authCookie: string) {
-  const users = await fetchUsers(authCookie)
+async function createUsers(knex: Knex, allUsers: boolean, authCookie: string) {
+  const users = await fetchUsers(allUsers, authCookie)
   const mentors = users.filter(({ role }) => role !== 'USER')
 
   console.log(`create ${users.length} users (${mentors.length} mentors)`)
@@ -201,51 +226,18 @@ async function publicListIds() {
   return data.data.lists.map(({ id }) => id)
 }
 
-async function fetchUsers(cookie: string) {
-  console.log('fetching users...')
+async function fetchUsers(allUsers: boolean, cookie?: string) {
+  console.log(`fetching ${allUsers ? 'users' : 'mentors'}...`)
   try {
     const { data } = await axios.post(
       API_URL,
       JSON.stringify({
-        query: `query FetchUsers {
-          userList(limit: 10000) {
-            edges {
-              node {
-                id
-                role
-                name
-                handle
-                headline
-                location
-                biography
-                website
-                social {
-                  id
-                  name
-                  url
-                  handle
-                }
-                tags {
-                  id
-                  name
-                }
-                profilePictures {
-                  size
-                  type
-                  url
-                }
-                ...on Mentor {
-                  visibility
-                  company
-                }
-              }
-            }
-          }
-        }`,
+        query: allUsers ? USER_QUERY : MENTOR_QUERY,
       }),
-      { headers: { cookie } }
+      cookie && { headers: { cookie } }
     )
     if (data.errors) throw { response: { data } }
+    if (!allUsers) return data.data.mentors
     return data.data.userList.edges.map(({ node }) => node)
   } catch (e) {
     for (const { message } of e.response.data.errors || []) {
@@ -254,3 +246,49 @@ async function fetchUsers(cookie: string) {
     throw Error("couldn't fetch users")
   }
 }
+
+const USER_INFO = `
+  id
+  role
+  name
+  handle
+  headline
+  location
+  biography
+  website
+  social {
+    id
+    name
+    url
+    handle
+  }
+  tags {
+    id
+    name
+  }
+  profilePictures {
+    size
+    type
+    url
+  }
+  ...on Mentor {
+    visibility
+    company
+  }
+`
+
+const USER_QUERY = `query FetchUsers {
+  userList(limit: 10000) {
+    edges {
+      node {
+        ${USER_INFO}
+      }
+    }
+  }
+}`
+
+const MENTOR_QUERY = `query FetchMentors {
+  mentors {
+    ${USER_INFO}
+  }
+}`
